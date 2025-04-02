@@ -31,9 +31,11 @@ jobs:
 
     - name: Build and push image
       run: |
-        image_tag="ghcr.io/${{ github.repository }}:${{ github.run_id }}"
+        version_tag="ghcr.io/${{ github.repository }}:${{ github.run_id }}"
+        latest_tag="ghcr.io/${{ github.repository }}:latest"
         ./build \
-          --tag "$image_tag" \
+          --tag "$version_tag" \
+          --tag "$latest_tag" \
           --push
 
         cat >"$GITHUB_STEP_SUMMARY" <<~~
@@ -41,5 +43,9 @@ jobs:
 
         Pull the image for local use:
 
-            docker pull $image_tag
+            docker pull $version_tag
+
+        or
+
+            docker pull $latest_tag
         ~~
