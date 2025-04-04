@@ -5,7 +5,6 @@ RUN micromamba install -y -n base -f /tmp/env.yaml && \
     micromamba clean --all --yes
 
 COPY process-sequence /sbin/
-RUN chmod a+rx /sbin/process-sequence
 
 WORKDIR /workdir
 COPY defaults/ defaults/
