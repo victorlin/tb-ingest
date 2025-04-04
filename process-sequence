@@ -46,6 +46,9 @@ fastq2="${fastq_dir}/${sra_id}_2.fastq.gz"
 
 get-fastq() {
     echo "Downloading SRA file…" >&2
+    # This is basically `prefetch $sra_id` but optimized for running on AWS (ideally in us-east-1).
+    # FIXME: Download fastq directly from s3://sra-pub-src-1/ or s3://sra-pub-src-2/ if possible, to avoid fastq-dump.
+    # Maybe not possible since we are filtering to Illumina which is not listed on <https://registry.opendata.aws/ncbi-sra/>.
     aws s3 cp --no-sign-request "s3://sra-pub-run-odp/sra/${sra_id}/${sra_id}" "${sra_id}.sra"
 
     echo "Dumping FASTQ…" >&2
