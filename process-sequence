@@ -15,6 +15,7 @@ s3_bucket="fh-pi-bedford-t-eco-public"
 
 
 main() {
+    get-fastq
     check-aws
     get-tb-profiler-files
     get-snippy-files
@@ -44,14 +45,12 @@ fastq2="${fastq_dir}/${sra_id}_2.fastq.gz"
 
 
 get-fastq() {
-    if [[ ! -f "${fastq1}" ]]; then
-        echo "Downloading fastq files…" >&2
-        parallel-fastq-dump --split-files --gzip --sra-id "${sra_id}" --threads "${cores}" --outdir "${fastq_dir}"
+    echo "Downloading fastq files…" >&2
+    parallel-fastq-dump --split-files --gzip --sra-id "${sra_id}" --threads "${cores}" --outdir "${fastq_dir}"
 
-        if [[ ! -f "${fastq1}" ]]; then
-            echo "Error: FASTQ file _1.fastq.gz not found for ${sra_id}" >&2
-            exit 1
-        fi
+    if [[ ! -f "${fastq1}" ]]; then
+        echo "Error: FASTQ file _1.fastq.gz not found for ${sra_id}" >&2
+        exit 1
     fi
 }
 
@@ -64,22 +63,16 @@ get-tb-profiler-files() {
     local_path="${tb_profiler_out}/results/${sra_id}.results.json"
     s3_path="files/workflows/tb/${local_path}"
 
-    if aws s3api head-object --bucket "${s3_bucket}" --key "${s3_path}" > /dev/null 2>&1; then
-        echo "Found tb-profiler results on S3. Skipping…" >&2
+    echo "Running tb-profiler…" >&2
+
+    if [[ -f "${fastq2}" ]]; then
+        tb-profiler profile -1 "${fastq1}" -2 "${fastq2}" -p "${sra_id}" --txt --dir "${tb_profiler_out}"
     else
-        get-fastq
-
-        echo "Running tb-profiler…" >&2
-
-        if [[ -f "${fastq2}" ]]; then
-            tb-profiler profile -1 "${fastq1}" -2 "${fastq2}" -p "${sra_id}" --txt --dir "${tb_profiler_out}"
-        else
-            tb-profiler profile -1 "${fastq1}"                -p "${sra_id}" --txt --dir "${tb_profiler_out}"
-        fi
-
-        echo "Uploading results to S3…" >&2
-        aws s3 cp "${local_path}" "s3://${s3_bucket}/${s3_path}"
+        tb-profiler profile -1 "${fastq1}"                -p "${sra_id}" --txt --dir "${tb_profiler_out}"
     fi
+
+    echo "Uploading results to S3…" >&2
+    aws s3 cp "${local_path}" "s3://${s3_bucket}/${s3_path}"
 }
 
 
@@ -91,35 +84,29 @@ get-snippy-files() {
     local_path="${snippy_out}"
     s3_path="files/workflows/tb/${local_path}"
 
-    if [ "$(aws s3api list-objects-v2 --bucket "${s3_bucket}" --prefix "${s3_path}" --query "Contents[]")" != "null" ]; then
-        echo "Found snippy results on S3. Skipping…" >&2
+    echo "Running snippy…" >&2
+
+    reference="defaults/GCF_000195955.2_ASM19595v2_genomic.gbff"
+
+    if [[ -f "${fastq2}" ]]; then
+        snippy \
+            --cpus "${cores}" \
+            --outdir "${snippy_out}" \
+            --R1 "${fastq1}" \
+            --R2 "${fastq2}" \
+            --ref "${reference}" \
+            --force
     else
-        get-fastq
-
-        echo "Running snippy…" >&2
-
-        reference="defaults/GCF_000195955.2_ASM19595v2_genomic.gbff"
-
-        if [[ -f "${fastq2}" ]]; then
-            snippy \
-                --cpus "${cores}" \
-                --outdir "${snippy_out}" \
-                --R1 "${fastq1}" \
-                --R2 "${fastq2}" \
-                --ref "${reference}" \
-                --force
-        else
-            snippy \
-                --cpus "${cores}" \
-                --outdir "${snippy_out}" \
-                --se "${fastq1}" \
-                --ref "${reference}" \
-                --force
-        fi
-
-        echo "Uploading results to S3…" >&2
-        aws s3 cp --recursive "${local_path}" "s3://${s3_bucket}/${s3_path}"
+        snippy \
+            --cpus "${cores}" \
+            --outdir "${snippy_out}" \
+            --se "${fastq1}" \
+            --ref "${reference}" \
+            --force
     fi
+
+    echo "Uploading results to S3…" >&2
+    aws s3 cp --recursive "${local_path}" "s3://${s3_bucket}/${s3_path}"
 }
 
 main
