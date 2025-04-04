@@ -39,9 +39,9 @@ fastq_dir="data/fastq"
 mkdir -p "${fastq_dir}"
 
 # For all samples
-fastq1="${fastq_dir}/${sra_id}_1.fastq.gz"
+fastq1="${fastq_dir}/${sra_id}_1.fastq"
 # For paired-end samples
-fastq2="${fastq_dir}/${sra_id}_2.fastq.gz"
+fastq2="${fastq_dir}/${sra_id}_2.fastq"
 
 
 get-fastq() {
@@ -52,11 +52,10 @@ get-fastq() {
     aws s3 cp --no-sign-request "s3://sra-pub-run-odp/sra/${sra_id}/${sra_id}" "${sra_id}.sra"
 
     echo "Dumping FASTQ…" >&2
-    # FIXME: try without gzip, seems unnecessary
-    fastq-dump --split-files --gzip --outdir "${fastq_dir}" "${sra_id}.sra"
+    fasterq-dump --split-files --outdir "${fastq_dir}" "${sra_id}.sra"
 
     if [[ ! -f "${fastq1}" ]]; then
-        echo "Error: FASTQ file _1.fastq.gz not found for ${sra_id}" >&2
+        echo "Error: FASTQ file _1.fastq not found for ${sra_id}" >&2
         exit 1
     fi
 }
