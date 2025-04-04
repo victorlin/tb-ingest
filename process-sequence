@@ -9,14 +9,14 @@ set -euo pipefail
 sra_id=$1
 # sra_id=SRR19320509
 
-cores=4
+cpus=1
 
 s3_bucket="fh-pi-bedford-t-eco-public"
 
 
 main() {
-    get-fastq
     check-aws
+    get-fastq
     get-tb-profiler-files
     get-snippy-files
 }
@@ -45,8 +45,12 @@ fastq2="${fastq_dir}/${sra_id}_2.fastq.gz"
 
 
 get-fastq() {
-    echo "Downloading fastq files…" >&2
-    parallel-fastq-dump --split-files --gzip --sra-id "${sra_id}" --threads "${cores}" --outdir "${fastq_dir}"
+    echo "Downloading SRA file…" >&2
+    aws s3 cp --no-sign-request "s3://sra-pub-run-odp/sra/${sra_id}/${sra_id}" "${sra_id}.sra"
+
+    echo "Dumping FASTQ…" >&2
+    # FIXME: try without gzip, seems unnecessary
+    fastq-dump --split-files --gzip --outdir "${fastq_dir}" "${sra_id}.sra"
 
     if [[ ! -f "${fastq1}" ]]; then
         echo "Error: FASTQ file _1.fastq.gz not found for ${sra_id}" >&2
@@ -66,9 +70,20 @@ get-tb-profiler-files() {
     echo "Running tb-profiler…" >&2
 
     if [[ -f "${fastq2}" ]]; then
-        tb-profiler profile -1 "${fastq1}" -2 "${fastq2}" -p "${sra_id}" --txt --dir "${tb_profiler_out}"
+        tb-profiler profile \
+            --threads "${cpus}" \
+            -1 "${fastq1}" \
+            -2 "${fastq2}" \
+            -p "${sra_id}" \
+            --txt \
+            --dir "${tb_profiler_out}"
     else
-        tb-profiler profile -1 "${fastq1}"                -p "${sra_id}" --txt --dir "${tb_profiler_out}"
+        tb-profiler profile \
+            --threads "${cpus}" \
+            -1 "${fastq1}" \
+            -p "${sra_id}" \
+            --txt \
+            --dir "${tb_profiler_out}"
     fi
 
     echo "Uploading results to S3…" >&2
@@ -90,7 +105,7 @@ get-snippy-files() {
 
     if [[ -f "${fastq2}" ]]; then
         snippy \
-            --cpus "${cores}" \
+            --cpus "${cpus}" \
             --outdir "${snippy_out}" \
             --R1 "${fastq1}" \
             --R2 "${fastq2}" \
@@ -98,7 +113,7 @@ get-snippy-files() {
             --force
     else
         snippy \
-            --cpus "${cores}" \
+            --cpus "${cpus}" \
             --outdir "${snippy_out}" \
             --se "${fastq1}" \
             --ref "${reference}" \
